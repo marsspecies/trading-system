@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "common/*": ["src/components/common/*"],
+      "charts/*": ["src/components/charts/*"],
+      "graphqls/*": ["src/actions/graphql/*"],
+      "utils/*": ["src/utils/*"],
+      "styles/*": ["src/styles/*"],
+    }
+  }
+}
