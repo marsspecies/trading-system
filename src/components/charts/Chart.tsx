@@ -14,7 +14,7 @@ const Chart: FC = () => {
 
   useEffect(() => {
     if (!result || !chart.current) return
-    const option = getOptions(result)
+    const option = getOptions(result, '1d', 100)
 
     chart.current.setOption(option)
   }, [result])

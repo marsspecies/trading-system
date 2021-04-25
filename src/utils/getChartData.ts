@@ -110,8 +110,6 @@ export const getOptions = (
     return result
   }
 
-  console.log((candleData as any).concat(getCandleEmptyData(futureData)))
-
   const lengendTime = `CRO_USDT ${timeframe}`
 
   let option: echarts.EChartOption = {
