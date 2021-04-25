@@ -16,35 +16,49 @@ const getDateStr = (dateTime: number): string => {
 const getPredictData = (
   pastData: DataItem[],
   pastDates: number[]
-): { futureData: number[]; futureDates: string[] } => {
-  const futureData: number[] = []
+): {
+  futureData: DataItem[]
+  futureAverageData: number[]
+  futureDates: string[]
+} => {
+  const futureData: DataItem[] = []
+  const futureAverageData: number[] = []
   const futureDates: string[] = []
   const pastAveragePrice: number[] = []
   const reversePastData = [...pastData].reverse()
-  reversePastData.forEach((item, index) => {
+  const originItemData = reversePastData[0]
+  const originAveragePrice = Number(
+    ((originItemData[3] + originItemData[2]) / 2).toFixed(4)
+  )
+  const originOpenPrice = originItemData[0]
+  const originClosePrice = originItemData[1]
+  const originLowestPrice = originItemData[2]
+  const originHighestPrice = originItemData[3]
+
+  reversePastData.slice(1).forEach((item, index) => {
     const averagePrice = Number(((item[3] + item[2]) / 2).toFixed(4))
     pastAveragePrice.push(averagePrice)
-    if (!index) {
-      futureData.push(averagePrice)
-    } else {
-      const lastAveragePrice = pastAveragePrice[index - 1]
-      const futurePrice = Number(
-        (lastAveragePrice - (averagePrice - lastAveragePrice)).toFixed(4)
-      )
-      futureData.push(futurePrice)
-    }
+    // exchange the price
+
+    const openPrice = Number((2 * originAveragePrice - item[1]).toFixed(4))
+    const closePrice = Number((2 * originAveragePrice - item[0]).toFixed(4))
+    const lowestPrice = Number((2 * originAveragePrice - item[3]).toFixed(4))
+    const highestPrice = Number((2 * originAveragePrice - item[2]).toFixed(4))
+    const futureAveragePrice = Number(
+      (2 * originAveragePrice - averagePrice).toFixed(4)
+    )
+    futureAverageData.push(futureAveragePrice)
+    futureData.push([openPrice, closePrice, lowestPrice, highestPrice])
   })
 
   const reversePastDates = [...pastDates].reverse()
-  reversePastDates.forEach((item, index) => {
-    if (index) {
-      futureDates.push(getDateStr(2 * reversePastDates[0] - item))
-    } else {
-      futureDates.push(getDateStr(item))
-    }
+  const originDate = reversePastDates[0]
+  reversePastDates.slice(1).forEach((item, index) => {
+    futureDates.push(getDateStr(2 * originDate - item))
   })
   return {
     futureData,
+    futureAverageData,
     futureDates,
   }
 }
@@ -64,11 +78,19 @@ export const getOptions = (
     candleData.push([item[1], item[4], item[3], item[2]])
   })
 
-  const { futureData, futureDates } = getPredictData(
-    candleData.slice(candleData.length - pastCount - 1),
-    dateTimes.slice(candleData.length - pastCount - 1)
+  const selectedPastCandleData = candleData.slice(
+    candleData.length - pastCount - 1
+  )
+  const selectedPastDates = dateTimes.slice(candleData.length - pastCount - 1)
+
+  const { futureData, futureDates, futureAverageData } = getPredictData(
+    selectedPastCandleData,
+    selectedPastDates
   )
 
+  const getCandleEmptyData = (data: any[]) => {
+    return data.map(() => ['-', '-', '-', '-'])
+  }
   const getEmptyData = (data: any[]) => {
     return data.map(() => '-')
   }
@@ -88,11 +110,21 @@ export const getOptions = (
     return result
   }
 
+  console.log((candleData as any).concat(getCandleEmptyData(futureData)))
+
   const lengendTime = `CRO_USDT ${timeframe}`
 
   let option: echarts.EChartOption = {
     legend: {
-      data: [lengendTime, 'Future', 'MA5', 'MA10', 'MA20', 'MA30'],
+      data: [
+        lengendTime,
+        'Future',
+        'Future-average',
+        'MA5',
+        'MA10',
+        'MA20',
+        'MA30',
+      ],
       // inactiveColor: '#777',
     },
     tooltip: {
@@ -147,7 +179,7 @@ export const getOptions = (
       {
         type: 'candlestick',
         name: lengendTime,
-        data: (candleData as any).concat(getEmptyData(futureData)),
+        data: (candleData as any).concat(getCandleEmptyData(futureData)),
         itemStyle: {
           color: '#FD1050',
           color0: '#0CF49B',
@@ -157,8 +189,22 @@ export const getOptions = (
       },
       {
         name: 'Future',
+        type: 'candlestick',
+        data: getCandleEmptyData(candleData).concat(futureData as any),
+        showAllSymbol: true,
+        itemStyle: {
+          normal: {
+            color: '#ddd',
+            color0: '#ddd',
+            borderColor: '#fa6464',
+            borderColor0: '#32C896',
+          },
+        },
+      },
+      {
+        name: 'Future-average',
         type: 'line',
-        data: getEmptyData(candleData).concat(futureData as any),
+        data: getEmptyData(candleData).concat(futureAverageData as any),
         smooth: true,
         showSymbol: false,
         itemStyle: {
