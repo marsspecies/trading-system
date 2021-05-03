@@ -3,7 +3,7 @@ import ccxt, { OHLCV } from 'ccxt'
 // DateItem = [open, close, lowest, highest]
 type DataItem = [number, number, number, number]
 
-type TimeFrame = '1d' | '1m' | '5m' | '15m' | '30m' | '1w' | '1M' | '1H'
+export type TimeFrame = '1d' | '1m' | '5m' | '15m' | '30m' | '1w' | '1M' | '1H'
 
 const getDateStr = (dateTime: number): string => {
   const date = new Date(dateTime)
@@ -63,11 +63,36 @@ const getPredictData = (
   }
 }
 
-export const getOptions = (
-  data: OHLCV[],
-  timeframe: TimeFrame = '1d',
-  pastCount: number = 30
-) => {
+function calculateMA(dayCount: number, data: DataItem[]) {
+  let result = []
+  for (let i = 0, len = data.length; i < len; i++) {
+    if (i < dayCount) {
+      result.push('-')
+      continue
+    }
+    let sum = 0
+    for (let j = 0; j < dayCount; j++) {
+      sum += data[i - j][1]
+    }
+    result.push((sum / dayCount).toFixed(4))
+  }
+  return result
+}
+
+interface OptionConfig {
+  data: OHLCV[]
+  tradingPair: string
+  timeframe?: TimeFrame
+  pastCount?: number
+  originIndex?: number
+}
+export const getOptions = ({
+  data,
+  tradingPair,
+  timeframe = '1d',
+  pastCount = 30,
+  originIndex = data.length - 1,
+}: OptionConfig) => {
   const candleData: DataItem[] = []
   const dateTimes: number[] = []
   const dates: string[] = []
@@ -79,9 +104,13 @@ export const getOptions = (
   })
 
   const selectedPastCandleData = candleData.slice(
-    candleData.length - pastCount - 1
+    originIndex - pastCount,
+    originIndex + 1
   )
-  const selectedPastDates = dateTimes.slice(candleData.length - pastCount - 1)
+  const selectedPastDates = dateTimes.slice(
+    originIndex - pastCount,
+    originIndex + 1
+  )
 
   const { futureData, futureDates, futureAverageData } = getPredictData(
     selectedPastCandleData,
@@ -94,23 +123,74 @@ export const getOptions = (
   const getEmptyData = (data: any[]) => {
     return data.map(() => '-')
   }
-  function calculateMA(dayCount: number, data: DataItem[]) {
-    let result = []
-    for (let i = 0, len = data.length; i < len; i++) {
-      if (i < dayCount) {
-        result.push('-')
-        continue
-      }
-      let sum = 0
-      for (let j = 0; j < dayCount; j++) {
-        sum += data[i - j][1]
-      }
-      result.push((sum / dayCount).toFixed(4))
-    }
-    return result
-  }
 
-  const lengendTime = `CRO_USDT ${timeframe}`
+  const lengendTime = `${tradingPair} ${timeframe}`
+
+  let completedCandleData: any[] = candleData
+  let completedFutureData: any[]
+  let completedFutureAverageData: any[]
+  let MA5Data: any[] = calculateMA(5, candleData)
+  let MA10Data: any[] = calculateMA(10, candleData)
+  let MA20Data: any[] = calculateMA(20, candleData)
+  let MA30Data: any[] = calculateMA(30, candleData)
+  const differ = candleData.length - 1 - originIndex
+  if (differ > 0) {
+    const leftRedundantData = candleData.slice(0, originIndex + 1)
+    if (differ < pastCount) {
+      // use the past selected day as origin to predict past data and future data
+      const candleDataLength = candleData.length
+      completedFutureData = getCandleEmptyData(leftRedundantData).concat(
+        futureData as any
+      )
+      const rightRedundantData = completedFutureData.slice(candleDataLength)
+      const rightEmptyLineData = getEmptyData(
+        completedFutureData.slice(candleDataLength)
+      )
+      completedCandleData = completedCandleData.concat(
+        getCandleEmptyData(rightRedundantData)
+      )
+      MA5Data = MA5Data.concat(rightEmptyLineData)
+      MA10Data = MA10Data.concat(rightEmptyLineData)
+      MA20Data = MA20Data.concat(rightEmptyLineData)
+      MA30Data = MA30Data.concat(rightEmptyLineData)
+      completedFutureAverageData = getEmptyData(leftRedundantData).concat(
+        futureAverageData as any
+      )
+    } else if (differ > pastCount) {
+      // use the past selected day as origin to predict past data
+      const rightRedundantData = candleData.slice(originIndex + pastCount + 1)
+      completedFutureData = getCandleEmptyData(leftRedundantData)
+        .concat(futureData as any)
+        .concat(getCandleEmptyData(rightRedundantData) as any)
+      completedFutureAverageData = getEmptyData(leftRedundantData)
+        .concat(futureAverageData as any)
+        .concat(getEmptyData(rightRedundantData) as any)
+    } else {
+      // use the past selected day as origin to predict past data and the last predict date is today
+      completedFutureData = getCandleEmptyData(leftRedundantData).concat(
+        futureData as any
+      )
+      completedFutureAverageData = getEmptyData(leftRedundantData).concat(
+        futureData as any
+      )
+    }
+  } else {
+    // the origin is today
+    completedCandleData = (candleData as any).concat(
+      getCandleEmptyData(futureData)
+    )
+    const rightEmptyData = getEmptyData(futureData)
+    MA5Data = MA5Data.concat(rightEmptyData)
+    MA10Data = MA10Data.concat(rightEmptyData)
+    MA20Data = MA20Data.concat(rightEmptyData)
+    MA30Data = MA30Data.concat(rightEmptyData)
+    completedFutureData = getCandleEmptyData(candleData).concat(
+      futureData as any
+    )
+    completedFutureAverageData = getEmptyData(candleData).concat(
+      futureAverageData as any
+    )
+  }
 
   let option: echarts.EChartOption = {
     legend: {
@@ -177,7 +257,7 @@ export const getOptions = (
       {
         type: 'candlestick',
         name: lengendTime,
-        data: (candleData as any).concat(getCandleEmptyData(futureData)),
+        data: completedCandleData,
         itemStyle: {
           color: '#FD1050',
           color0: '#0CF49B',
@@ -188,21 +268,21 @@ export const getOptions = (
       {
         name: 'Future',
         type: 'candlestick',
-        data: getCandleEmptyData(candleData).concat(futureData as any),
+        data: completedFutureData,
         showAllSymbol: true,
         itemStyle: {
           normal: {
             color: '#ddd',
             color0: '#ddd',
-            borderColor: '#fa6464',
-            borderColor0: '#32C896',
+            borderColor: '#ddd',
+            borderColor0: '#ddd',
           },
         },
       },
       {
         name: 'Future-average',
         type: 'line',
-        data: getEmptyData(candleData).concat(futureAverageData as any),
+        data: completedFutureAverageData,
         smooth: true,
         showSymbol: false,
         itemStyle: {
@@ -216,7 +296,7 @@ export const getOptions = (
       {
         name: 'MA5',
         type: 'line',
-        data: calculateMA(5, candleData).concat(getEmptyData(futureData)),
+        data: MA5Data,
         smooth: true,
         showSymbol: false,
         lineStyle: {
@@ -226,7 +306,7 @@ export const getOptions = (
       {
         name: 'MA10',
         type: 'line',
-        data: calculateMA(10, candleData).concat(getEmptyData(futureData)),
+        data: MA10Data,
         smooth: true,
         showSymbol: false,
         lineStyle: {
@@ -236,7 +316,7 @@ export const getOptions = (
       {
         name: 'MA20',
         type: 'line',
-        data: calculateMA(20, candleData).concat(getEmptyData(futureData)),
+        data: MA20Data,
         smooth: true,
         showSymbol: false,
         lineStyle: {
@@ -246,7 +326,7 @@ export const getOptions = (
       {
         name: 'MA30',
         type: 'line',
-        data: calculateMA(30, candleData).concat(getEmptyData(futureData)),
+        data: MA30Data,
         smooth: true,
         showSymbol: false,
         lineStyle: {

@@ -1,13 +1,12 @@
-import React, { useEffect } from 'react'
-
-import Chart from './components/charts/Chart'
-import logo from './logo.svg'
+import React from 'react'
 import './App.css'
+import 'antd/dist/antd.css'
+import Container from '@components/layouts/Container'
 
 function App() {
   return (
     <div className="App">
-      <Chart></Chart>
+      <Container></Container>
     </div>
   )
 }
