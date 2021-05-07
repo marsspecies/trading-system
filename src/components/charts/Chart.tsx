@@ -1,10 +1,24 @@
-import React, { FC, useEffect, useRef, useState } from 'react'
+import React, {
+  FC,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import * as echarts from 'echarts'
-import { fetchHuobiproKlineOfCroUsdt } from 'utils/initExchange'
-import { useAsyncCall } from 'utils/hooks'
-import { getOptions } from 'utils/getChartData'
+import { getOptions, TimeFrame } from 'utils/getChartData'
+import { OHLCV } from 'ccxt'
 
 import { ConfigData } from '../layouts/Sidebar'
+
+interface ClickEventContext {
+  data: OHLCV[]
+  seriesName: string
+  tradingPair: string
+  timeframe: TimeFrame
+  pastCount: number
+}
 
 enum ComponentSubType {
   candlestick = 'candlestick',
@@ -12,46 +26,72 @@ enum ComponentSubType {
 }
 interface Props {
   config: ConfigData
+  data: OHLCV[] | null
+  loading: boolean
 }
 const Chart: FC<Props> = ({
   config: { tradingPair, timeframe, pastCount },
+  data,
+  loading,
 }) => {
   const chart = useRef<echarts.ECharts>()
-  const [getkline, { result }] = useAsyncCall(fetchHuobiproKlineOfCroUsdt)
+
+  const seriesName = useMemo(() => `${tradingPair} ${timeframe}`, [
+    timeframe,
+    tradingPair,
+  ])
+
+  const handleBarClick = useCallback(function (
+    this: ClickEventContext,
+    params: any
+  ) {
+    let {
+      data,
+      tradingPair,
+      timeframe,
+      pastCount,
+      seriesName,
+    } = this as ClickEventContext
+
+    if (
+      params.componentSubType === ComponentSubType.candlestick &&
+      params.seriesName === seriesName
+    ) {
+      const option = getOptions({
+        data,
+        tradingPair,
+        timeframe,
+        pastCount,
+        originIndex: params.data[0],
+      })
+      chart.current?.setOption(option)
+    }
+  },
+  [])
 
   useEffect(() => {
-    getkline(tradingPair, timeframe)
-  }, [getkline, timeframe, tradingPair])
+    if (!data || !chart.current || loading) return
 
-  useEffect(() => {
-    if (!result || !chart.current) return
-
-    const seriesName = `${tradingPair} ${timeframe}`
     const option = getOptions({
-      data: result,
+      data,
       tradingPair,
       timeframe,
       pastCount,
     })
 
     chart.current.setOption(option)
-    chart.current?.on('click', (params: any) => {
-      if (
-        params.componentSubType === ComponentSubType.candlestick &&
-        params.seriesName === seriesName
-      ) {
-        console.log(params.data[0])
-        const option = getOptions({
-          data: result,
-          tradingPair,
-          timeframe,
-          pastCount: 100,
-          originIndex: params.data[0],
-        })
-        chart.current?.setOption(option)
-      }
+  }, [data, handleBarClick, loading, pastCount, timeframe, tradingPair])
+
+  useEffect(() => {
+    chart.current?.off('click', handleBarClick)
+    chart.current?.on('click', handleBarClick, {
+      data,
+      tradingPair,
+      timeframe,
+      pastCount,
+      seriesName,
     })
-  }, [pastCount, result, timeframe, tradingPair])
+  }, [data, handleBarClick, pastCount, seriesName, timeframe, tradingPair])
 
   return (
     <div

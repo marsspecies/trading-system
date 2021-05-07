@@ -1,5 +1,7 @@
 import { TimeFrame } from '@src/utils/getChartData'
-import React, { FC, useState } from 'react'
+import { useAsyncCall, useFetch, usePromiseCall } from '@src/utils/hooks'
+import { fetchHuobiproKline } from '@src/utils/initExchange'
+import React, { FC, useCallback, useEffect, useState } from 'react'
 
 import Chart from '../charts/Chart'
 
@@ -14,14 +16,26 @@ const defaultConfigData: ConfigData = {
 const Container: FC = () => {
   const [config, setConfig] = useState<ConfigData>(defaultConfigData)
 
+  const getKilineData = useCallback(() => {
+    const { timeframe, tradingPair } = defaultConfigData
+
+    return fetchHuobiproKline(tradingPair, timeframe)
+  }, [])
+  const { result: initResult } = usePromiseCall(getKilineData)
+  const [getkline, { result, loading }] = useAsyncCall(fetchHuobiproKline)
+
   const onchange = (newConfig: ConfigData) => {
-    setConfig({ ...config, ...newConfig })
+    const assignConfig = { ...config, ...newConfig }
+    const { timeframe, tradingPair } = assignConfig
+    setConfig(assignConfig)
+    getkline(tradingPair, timeframe)
   }
+
   return (
     <div className="flex">
-      <SideBar config={config} onChange={onchange} />
+      <SideBar config={config} onChange={onchange} loading={loading} />
       <div className="flex-1">
-        <Chart config={config} />
+        <Chart config={config} data={result || initResult} loading={loading} />
       </div>
     </div>
   )

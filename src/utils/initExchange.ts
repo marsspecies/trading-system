@@ -58,7 +58,7 @@ export const init = async (): Promise<{
   }
 }
 
-export const fetchHuobiproKlineOfCroUsdt = async (
+export const fetchHuobiproKline = async (
   tradingPair: string,
   timeframe: string = '1d'
 ) => {

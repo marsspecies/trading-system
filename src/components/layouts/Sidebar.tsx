@@ -2,7 +2,9 @@ import React, { FC, useEffect, useState } from 'react'
 import { Form, Select, Button, Input } from 'antd'
 import { ErrorListProps } from 'antd/lib/form'
 import { TimeFrame } from '@src/utils/getChartData'
-import { init } from '@src/utils/initExchange'
+import { fetchHuobiproKline, init } from '@src/utils/initExchange'
+import { OHLCV } from 'ccxt'
+import { useAsyncCall } from '@src/utils/hooks'
 
 const { Option } = Select
 
@@ -21,9 +23,11 @@ export interface ConfigData {
 interface Props {
   onChange: (data: ConfigData) => void
   config: ConfigData
+  loading?: boolean
 }
-const SideBar: FC<Props> = ({ onChange, config }) => {
+const SideBar: FC<Props> = ({ onChange, config, loading }) => {
   const [tradingParis, setTradingParis] = useState<string[]>()
+
   const onFinish = (value: ConfigData) => {
     onChange(value)
   }
@@ -99,7 +103,7 @@ const SideBar: FC<Props> = ({ onChange, config }) => {
           <Input type="number" />
         </Form.Item>
         <Form.Item {...tailLayout}>
-          <Button type="primary" htmlType="submit">
+          <Button type="primary" htmlType="submit" loading={loading}>
             Submit
           </Button>
         </Form.Item>
