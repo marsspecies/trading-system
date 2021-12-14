@@ -1,11 +1,13 @@
 import ccxt, { OHLCV } from 'ccxt'
 
+import { getLocalJsonField } from './helpers/storageHelper'
+
 // DateItem = [open, close, lowest, highest]
 type DataItem = [number, number, number, number]
 
 export type TimeFrame = '1d' | '1m' | '5m' | '15m' | '30m' | '1w' | '1M' | '1H'
 
-const getDateStr = (dateTime: number): string => {
+export const getDateStr = (dateTime: number): string => {
   const date = new Date(dateTime)
   const dateStr = `${date.getFullYear()}/${
     date.getMonth() + 1
@@ -85,6 +87,7 @@ interface OptionConfig {
   timeframe?: TimeFrame
   pastCount?: number
   originIndex?: number
+  transactionResult: ccxt.Trade[] | null
 }
 export const getOptions = ({
   data,
@@ -92,7 +95,11 @@ export const getOptions = ({
   timeframe = '1d',
   pastCount = 30,
   originIndex = data.length - 1,
+  transactionResult,
 }: OptionConfig) => {
+  const transactions =
+    transactionResult || Object.values(getLocalJsonField(tradingPair) || {})
+  console.log(transactions)
   const candleData: DataItem[] = []
   const dateTimes: number[] = []
   const dates: string[] = []
@@ -264,6 +271,37 @@ export const getOptions = ({
           borderColor: '#FD1050',
           borderColor0: '#0CF49B',
         },
+        markPoint: transactions?.length
+          ? {
+              label: {
+                formatter: (params: any) => {
+                  const { data } = params.data
+                  return data
+                    ? `${Number((data.amount * data.price).toFixed(1))}`
+                    : ''
+                },
+              },
+              data: transactions.map(({ price, side, amount, info }) => {
+                console.log(info['created-at'], {
+                  name: `transaction_history`,
+                  coord: [getDateStr(info['created-at']), price],
+                  value: price,
+                  itemStyle: {
+                    color: 'rgb(41,60,85)',
+                  },
+                })
+                return {
+                  name: `${side}: ${amount}`,
+                  coord: [getDateStr(Number(info['created-at'])), price],
+                  value: price,
+                  data: { ...info, side, amount },
+                  itemStyle: {
+                    color: side === 'sell' ? 'green' : 'red',
+                  },
+                }
+              }),
+            }
+          : undefined,
       },
       {
         name: 'Future',

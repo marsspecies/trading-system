@@ -2,9 +2,6 @@ import React, { FC, useEffect, useState } from 'react'
 import { Form, Select, Button, Input } from 'antd'
 import { ErrorListProps } from 'antd/lib/form'
 import { TimeFrame } from '@src/utils/getChartData'
-import { fetchHuobiproKline, init } from '@src/utils/initExchange'
-import { OHLCV } from 'ccxt'
-import { useAsyncCall } from '@src/utils/hooks'
 
 const { Option } = Select
 
@@ -21,24 +18,24 @@ export interface ConfigData {
   pastCount: number
 }
 interface Props {
+  tradingPairs: string[]
   onChange: (data: ConfigData) => void
   config: ConfigData
   loading?: boolean
 }
-const SideBar: FC<Props> = ({ onChange, config, loading }) => {
-  const [tradingParis, setTradingParis] = useState<string[]>()
-
+const SideBar: FC<Props> = ({ onChange, config, loading, tradingPairs }) => {
+  const [changeLoading, setChangeLoading] = useState(false)
   const onFinish = (value: ConfigData) => {
+    setChangeLoading(true)
     onChange(value)
   }
   const onFinishFailed = (errorInfo: any) => {}
   const handleTradingPairChange = () => {}
 
   useEffect(() => {
-    init().then(({ tradingPairs }) => {
-      setTradingParis(tradingPairs)
-    })
-  }, [])
+    if (!loading) setChangeLoading(false)
+  }, [loading])
+
   return (
     <div className="w-370 py-32 px-md">
       <Form
@@ -58,7 +55,7 @@ const SideBar: FC<Props> = ({ onChange, config, loading }) => {
               option?.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
             }
           >
-            {tradingParis?.map(pair => (
+            {tradingPairs?.map(pair => (
               <Option value={pair} key={pair}>
                 {pair}
               </Option>
@@ -103,7 +100,7 @@ const SideBar: FC<Props> = ({ onChange, config, loading }) => {
           <Input type="number" />
         </Form.Item>
         <Form.Item {...tailLayout}>
-          <Button type="primary" htmlType="submit" loading={loading}>
+          <Button type="primary" htmlType="submit" loading={changeLoading}>
             Submit
           </Button>
         </Form.Item>

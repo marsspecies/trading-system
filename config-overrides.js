@@ -24,5 +24,7 @@ module.exports = override(
     utils: path.resolve(__dirname, './src/utils'),
     charts: path.resolve(__dirname, './src/actions/charts'),
     common: path.resolve(__dirname, './src/components/common'),
+    api: path.resolve(__dirname, './src/api'),
+    hooks: path.resolve(__dirname, './src/hooks'),
   })
 )

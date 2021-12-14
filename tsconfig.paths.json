@@ -8,6 +8,8 @@
       "charts/*": ["src/components/charts/*"],
       "graphqls/*": ["src/actions/graphql/*"],
       "utils/*": ["src/utils/*"],
+      "api/*": ["src/api/*"],
+      "hooks/*": ["src/hooks/*"],
       "styles/*": ["src/styles/*"],
     }
   }

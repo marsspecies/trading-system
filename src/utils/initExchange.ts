@@ -1,13 +1,33 @@
 import ccxt, { Exchange } from 'ccxt'
 
+import { getDateStr } from './getChartData'
+import { getLocalJsonField } from './helpers/storageHelper'
+import { getTodayStartTime } from './helpers/timeHelper'
+
 const CRO_USDT = 'CRO/USDT'
 
 export const init = async (): Promise<{
   tradingPairs: string[]
+  huobipro: ccxt.huobipro
 }> => {
   // const kraken = new ccxt.kraken()
   // const bitfinex = new ccxt.bitfinex({ verbose: true })
-  const huobipro = new ccxt.huobipro()
+  console.log(process.env)
+  const huobipro = new ccxt.huobipro({
+    apiKey: process.env.REACT_APP_API_KEY,
+    secret: process.env.REACT_APP_SECRET_KEY,
+    enableRateLimit: true,
+  })
+  console.log(huobipro.checkRequiredCredentials())
+  // const transactions = await huobipro.fetchMyTrades(
+  //   'LINK/USDT',
+  //   undefined,
+  //   undefined,
+  //   {
+  //     'start-time': new Date('2021-06-24').getTime(),
+  //     'end-time': new Date('2021-06-25').getTime(),
+  //   }
+  // )
   // const okcoinusd = new ccxt.okcoinusd({
   //   apiKey: 'YOUR_PUBLIC_API_KEY',
   //   secret: 'YOUR_SECRET_PRIVATE_KEY',
@@ -55,13 +75,82 @@ export const init = async (): Promise<{
 
   return {
     tradingPairs: Object.keys(huobiTradingPairs),
+    huobipro,
   }
 }
 
-export const fetchHuobiproKline = async (
+export const fetchKline = async (
+  exchange: Exchange,
   tradingPair: string,
   timeframe: string = '1d'
 ) => {
-  const huobipro = new ccxt.huobipro()
-  return await huobipro.fetchOHLCV(tradingPair, timeframe)
+  return await exchange.fetchOHLCV(tradingPair, timeframe)
+}
+
+export const fetchAllOrders = async (
+  exchange: Exchange,
+  tradingPair: string
+) => {
+  let startTime = exchange.milliseconds()
+  const dayMilliseconds = 24 * 3600 * 1000
+  const timeRanges = []
+  while (
+    startTime - dayMilliseconds > 0 &&
+    startTime - dayMilliseconds <= dayMilliseconds * 180
+  ) {
+    const endTime = startTime - dayMilliseconds
+    timeRanges.push({ startTime, endTime })
+    startTime -= dayMilliseconds
+  }
+  const asyncTasks = timeRanges.map(({ startTime, endTime }) => {
+    return exchange.fetchOrders(tradingPair, undefined, undefined, {
+      'start-time': startTime,
+      'end-time': endTime,
+    })
+  })
+  const results = await Promise.all(asyncTasks)
+  return results.flat()
+}
+
+export const fetchAllTransactions = async (
+  exchange: Exchange,
+  tradingPair: string
+) => {
+  let endTime = getTodayStartTime()
+  const dayMilliseconds = 24 * 3600 * 1000
+  const twoDayMilliseconds = dayMilliseconds * 2
+  const timeRanges = []
+  while (
+    endTime - twoDayMilliseconds > 0 &&
+    getTodayStartTime() - endTime <= dayMilliseconds * 10
+  ) {
+    const startTime = endTime - twoDayMilliseconds
+    timeRanges.push({ startTime, endTime })
+    endTime -= dayMilliseconds * 2
+  }
+  const storage = getLocalJsonField(tradingPair)
+  let newStorage: Record<string, ccxt.Trade> = storage || {}
+  const asyncTasks = timeRanges.map(({ startTime, endTime }) => {
+    return exchange
+      .fetchMyTrades(tradingPair, undefined, undefined, {
+        'start-time': startTime,
+        'end-time': endTime,
+      })
+      .then(res => {
+        const flatResults = res.flat()
+        flatResults.forEach(item => {
+          console.log(
+            getDateStr(Number(item.info['created-at'])),
+            item.datetime
+          )
+          newStorage[getDateStr(Number(item.info['created-at']))] = item
+        })
+        localStorage.setItem(tradingPair, JSON.stringify(newStorage))
+        return res
+      })
+  })
+
+  const results = await Promise.all(asyncTasks)
+
+  return Object.values(newStorage)
 }
